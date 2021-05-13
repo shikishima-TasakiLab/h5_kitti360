@@ -1,4 +1,5 @@
 
+import os
 from typing import Dict, List
 import numpy as np
 
@@ -31,11 +32,15 @@ class PlyData():
     properties_dtype:Dict[str, Dict[str, str]] = {}
     properties_bytes:Dict[str, int] = {}
     data:Dict[str, np.ndarray] = {}
+    dtype:Dict[str, np.dtype] = {}
 
     def __init__(self, ply_path:str):
         self.load(ply_path)
 
     def load(self, ply_path:str):
+        if os.path.isfile(ply_path) is False:
+            raise FileNotFoundError('File not found : {0}'.format(ply_path))
+
         with open(ply_path, mode='rb') as ply_file:
             current_element:str = ''
             while True:
@@ -61,22 +66,54 @@ class PlyData():
                 for element_key, element_item in self.elements.items():
                     for dtype_key in self.properties_dtype[element_key].keys():
                         self.properties_dtype[element_key][dtype_key] = endian + self.properties_dtype[element_key][dtype_key]
-                    self.data[element_key] = np.frombuffer(ply_file.read(element_item * self.properties_bytes[element_key]), dtype=np.dtype([(key, item) for key, item in self.properties_dtype[element_key].items()]), count=element_item)
+                    self.dtype[element_key] = np.dtype([(key, item) for key, item in self.properties_dtype[element_key].items()])
+                    self.data[element_key] = np.frombuffer(ply_file.read(element_item * self.properties_bytes[element_key]), dtype=self.dtype[element_key], count=element_item)
             elif self.ply_format == 'ascii':
                 for element_key, element_item in self.elements.items():
-                    dtype = np.dtype([(key, item) for key, item in self.properties_dtype[element_key].items()])
-                    self.data[element_key] = np.empty((0,), dtype=dtype)
+                    self.dtype[element_key] = np.dtype([(key, item) for key, item in self.properties_dtype[element_key].items()])
+                    self.data[element_key] = np.empty((0,), dtype=self.dtype[element_key])
                     for _ in range(element_item):
                         line:List[bytes] = ply_file.readline().split()
-                        self.data[element_key] = np.append(self.data[element_key], np.array(line, dtype=dtype), axis=0)
+                        self.data[element_key] = np.append(self.data[element_key], np.array(line, dtype=self.dtype[element_key]), axis=0)
             else:
                 raise NotImplementedError('Format "{0}" is not supported.')
 
+class VelodyneData():
+    dtype:np.dtype = np.dtype([('x', np.float32), ('y', np.float32), ('z', np.float32), ('intensity', np.float32)])
+    data:np.ndarray = np.empty((0,), dtype=dtype)
+
+    def __init__(self, file_path:str) -> None:
+        self.load(file_path)
+
+    def load(self, file_path:str) -> None:
+        if os.path.isfile(file_path) is False:
+            raise FileNotFoundError('File not found : {0}'.format(file_path))
+        self.data = np.fromfile(file_path, dtype=self.dtype)
+
+class SickData():
+    dtype:np.dtype = np.dtype([('y', np.float32), ('z', np.float32)])
+    data:np.ndarray = np.empty((0,), dtype=dtype)
+
+    def __init__(self, file_path:str) -> None:
+        self.load(file_path)
+
+    def load(self, file_path:str) -> None:
+        if os.path.isfile(file_path) is False:
+            raise FileNotFoundError('File not found : {0}'.format(file_path))
+        self.data = np.fromfile(file_path, dtype=self.dtype)
+        self.data['y'] = -self.data['y']
+
 if __name__=='__main__':
-    pd = PlyData('/data/KITTI-360/data_3d_semantics/2013_05_28_drive_0000_sync/static/000002_000385.ply')
-    print(pd.ply_version)
-    print(pd.ply_format)
-    print(pd.elements)
-    print(pd.properties_dtype)
-    print(pd.properties_bytes)
-    print(pd.data)
+    # pd = PlyData('/data/KITTI-360/data_3d_semantics/2013_05_28_drive_0000_sync/static/000002_000385.ply')
+    # print(pd.ply_version)
+    # print(pd.ply_format)
+    # print(pd.elements)
+    # print(pd.properties_dtype)
+    # print(pd.properties_bytes)
+    # print(pd.data)
+    vd = VelodyneData('/data/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/velodyne_points/data/0000000000.bin')
+    print(vd.data.shape)
+    print(vd.data.dtype)
+    sd = SickData('/data/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/sick_points/data/0000000000.bin')
+    print(sd.data.shape)
+    print(sd.data.dtype)

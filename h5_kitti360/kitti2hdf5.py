@@ -1,6 +1,7 @@
 import argparse
 from typing import Dict, Union
 import os
+from datetime import datetime
 import numpy as np
 import h5py
 from glob import glob
@@ -89,7 +90,137 @@ def create_labelconfig(dst_h5:H5Dataset):
     set_label_config(label_group, 44, 'unknown object'      ,  32,  32,  32)
     set_label_config(label_group, -1, 'license plate'       ,   0,   0, 142)
 
+def create_intrinsic(config:Dict[str, Union[str]], dst_h5:H5Dataset):
+    intrinsic_group:h5py.Group = dst_h5.get_common_group('intrinsic')
+    intrinsic_dict:Dict[str, Dict[str, Union[int, float]]] = {DIR_IMAGE00: {H5_ATTR_FRAMEID: FRAMEID_CAM0}, DIR_IMAGE01: {H5_ATTR_FRAMEID: FRAMEID_CAM1}}
+
+    with open(os.path.join(config[CONFIG_DATASET_ROOT_DIR], DIR_CALIBRATION, 'perspective.txt'), mode='r') as f:
+        line:str = f.readline()
+        while line:
+            values:List[str] = line.split()
+            if values[0] == 'S_rect_00:':
+                intrinsic_dict[DIR_IMAGE00]['width'] = int(float(values[1]))
+                intrinsic_dict[DIR_IMAGE00]['height'] = int(float(values[2]))
+            elif values[0] == 'P_rect_00:':
+                intrinsic_dict[DIR_IMAGE00]['Fx'] = float(values[1])
+                intrinsic_dict[DIR_IMAGE00]['Cx'] = float(values[3])
+                intrinsic_dict[DIR_IMAGE00]['Fy'] = float(values[6])
+                intrinsic_dict[DIR_IMAGE00]['Cy'] = float(values[7])
+            elif values[0] == 'S_rect_01:':
+                intrinsic_dict[DIR_IMAGE01]['width'] = int(float(values[1]))
+                intrinsic_dict[DIR_IMAGE01]['height'] = int(float(values[2]))
+            elif values[0] == 'P_rect_01:':
+                intrinsic_dict[DIR_IMAGE01]['Fx'] = float(values[1])
+                intrinsic_dict[DIR_IMAGE01]['Cx'] = float(values[3])
+                intrinsic_dict[DIR_IMAGE01]['Fy'] = float(values[6])
+                intrinsic_dict[DIR_IMAGE01]['Cy'] = float(values[7])
+            line = f.readline()
+    
+    for key, item in intrinsic_dict.items():
+        set_intrinsic(intrinsic_group, key, item['Fx'], item['Fy'], item['Cx'], item['Cy'], item['height'], item['width'], item[H5_ATTR_FRAMEID])
+
+def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
+    transforms_group:h5py.Group = dst_h5.get_common_group('tf_static')
+
+    calibration_dir = os.path.join(config[CONFIG_DATASET_ROOT_DIR], DIR_CALIBRATION)
+    
+    with open(os.path.join(calibration_dir, 'calib_cam_to_pose.txt'), mode='r') as f:
+        line:str = f.readline()
+        while line:
+            values:List[str] = line.split()
+            matrix:np.ndarray = np.identity(4, dtype=np.float32)
+            if values[0] == 'image_00:':
+                matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
+                translation, quaternion = matrix2quaternion(matrix)
+                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
+                set_pose(transforms_group, 'pose_to_cam0', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM0)
+            elif values[0] == 'image_01:':
+                matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
+                translation, quaternion = matrix2quaternion(matrix)
+                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
+                set_pose(transforms_group, 'pose_to_cam1', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM1)
+            elif values[0] == 'image_02:':
+                matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
+                translation, quaternion = matrix2quaternion(matrix)
+                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
+                set_pose(transforms_group, 'pose_to_cam2', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM2)
+            elif values[0] == 'image_03:':
+                matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
+                translation, quaternion = matrix2quaternion(matrix)
+                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
+                set_pose(transforms_group, 'pose_to_cam3', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM3)
+            line:str = f.readline()
+    
+    with open(os.path.join(calibration_dir, 'calib_cam_to_velo.txt'), mode='r') as f:
+        values:List[str] = f.readline().split()
+        matrix:np.ndarray = np.identity(4, dtype=np.float32)
+        matrix[0:3, :] = np.reshape(np.float32(values[0:12]), (3, 4))
+        translation, quaternion = matrix2quaternion(matrix)
+        set_pose(transforms_group, 'cam0_to_velo', translation, quaternion, FRAMEID_CAM0, FRAMEID_VELODYNE)
+    
+    with open(os.path.join(calibration_dir, 'calib_sick_to_velo.txt'), mode='r') as f:
+        values:List[str] = f.readline().split()
+        matrix:np.ndarray = np.identity(4, dtype=np.float32)
+        matrix[0:3, :] = np.reshape(np.float32(values[0:12]), (3, 4))
+        translation, quaternion = matrix2quaternion(matrix)
+        translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
+        set_pose(transforms_group, 'velo_to_sick', translation, quaternion, FRAMEID_VELODYNE, FRAMEID_SICK)
+
+def convert_timestamp(timestamp:str) -> Tuple[int, int]:
+    sec_str, nsec_str = timestamp.split('.')
+    return int(datetime.strptime(sec_str, '%Y-%m-%d %H:%M:%S').timestamp()), int(nsec_str)
+
 def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
+    data2dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_raw', config[CONFIG_SEQUENCE_DIR])
+    data3dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_3d_raw', config[CONFIG_SEQUENCE_DIR])
+
+    image00data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, DIR_DATA_RECT, '*.png')))
+    image01data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, DIR_DATA_RECT, '*.png')))
+    velodyne_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, DIR_DATA, '*.bin')))
+    sick_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, DIR_DATA, '*.bin')))
+
+    image00_timestamps:List[str]
+    with open(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, 'timestamps.txt'), mode='r') as f:
+        image00_timestamps = f.readlines()
+    image01_timestamps:List[str]
+    with open(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, 'timestamps.txt'), mode='r') as f:
+        image01_timestamps = f.readlines()
+    velodyne_timestamps:List[str]
+    with open(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, 'timestamps.txt'), mode='r') as f:
+        velodyne_timestamps = f.readlines()
+    sick_timestamps:List[str]
+    with open(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, 'timestamps.txt'), mode='r') as f:
+        sick_timestamps = f.readlines()
+    
+    raw_data_dict:Dict[str, Dict[str, Union[str, Tuple[str, int, int]]]] = {}
+    for image00_data_path, image01_data_path, velodyne_data_path, sick_data_path, \
+        image00_timestamp, image01_timestamp, velodyne_timestamp, sick_timestamp \
+        in image00data_paths, image01data_paths, velodyne_data_paths, sick_data_paths, \
+            image00_timestamps, image01_timestamps, velodyne_timestamps, sick_timestamps:
+
+        key = int(os.path.splitext(os.path.basename(image00_data_path)[0]))
+
+        raw_dataset:Dict[str, Union[str, Tuple[str, int, int]]] = {}
+
+        image00_sec, image00_nsec = convert_timestamp(image00_timestamp)
+        raw_dataset[DIR_IMAGE00] = (image00_data_path, image00_sec, image00_nsec)
+
+        image01_sec, image01_nsec = convert_timestamp(image01_timestamp)
+        raw_dataset[DIR_IMAGE01] = (image01_data_path, image01_sec, image01_nsec)
+
+        velodyne_sec, velodyne_nsec = convert_timestamp(velodyne_timestamp)
+        raw_dataset[DIR_VELODYNE_POINTS] = (velodyne_data_path, velodyne_sec, velodyne_nsec)
+
+        sick_sec, sick_nsec = convert_timestamp(sick_timestamp)
+        raw_dataset[DIR_SICK_POINTS] = (sick_data_path, sick_sec, sick_nsec)
+
+        raw_data_dict[str(key)] = raw_dataset
+
+    data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', 'train', config[CONFIG_SEQUENCE_DIR])
+
+    print(len(image00data_paths), len(image01data_paths))
+    print(len(image00_timestamps), len(image01_timestamps))
+
     data_group:h5py.Group = dst_h5.get_next_data_group()
 
 def main():
@@ -98,6 +229,7 @@ def main():
     parser.add_argument('-o', '--output-dir', type=str, metavar='PATH', required=True, help='Output Directory.')
     parser.add_argument('-s', '--sequence', type=int, choices=[0,2,3,4,5,6,7,9,10], required=True, help='Sequence of KITTI-360 Dataset.')
     args = parser.parse_args()
+    
     config:Dict[str, Union[str, int]] = {}
     config[CONFIG_DATASET_ROOT_DIR] = args.dataset_root_dir
     config[CONFIG_SEQUENCE] = args.sequence
@@ -106,10 +238,19 @@ def main():
         raise NotADirectoryError('"{0}" is not a directory.'.format(args.output_dir))
     config[CONFIG_HDF5_PATH] = os.path.join(args.output_dir, 'kitti360_seq{0:02d}.hdf5'.format(config[CONFIG_SEQUENCE]))
     print(config)
+    
     h5file:H5Dataset = H5Dataset(config[CONFIG_HDF5_PATH])
-    create_sequential_data(config, h5file)
-    create_semanticsmap(config, h5file)
+
+    data_group:h5py.Group = h5file.get_next_data_group()
+    # create_sequential_data(config, h5file)
+    
+    create_intrinsic(config, h5file)
+
+    create_static_transforms(config, h5file)
+
+    # create_semanticsmap(config, h5file)
     create_labelconfig(h5file)
+    
     h5file.close()
 
 if __name__=='__main__':
