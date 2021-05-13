@@ -195,10 +195,10 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     raw_data_dict:Dict[str, Dict[str, Union[str, Tuple[str, int, int]]]] = {}
     for image00_data_path, image01_data_path, velodyne_data_path, sick_data_path, \
         image00_timestamp, image01_timestamp, velodyne_timestamp, sick_timestamp \
-        in image00data_paths, image01data_paths, velodyne_data_paths, sick_data_paths, \
-            image00_timestamps, image01_timestamps, velodyne_timestamps, sick_timestamps:
+        in zip(image00data_paths, image01data_paths, velodyne_data_paths, sick_data_paths, \
+            image00_timestamps, image01_timestamps, velodyne_timestamps, sick_timestamps):
 
-        key = int(os.path.splitext(os.path.basename(image00_data_path)[0]))
+        key = int(os.path.splitext(os.path.basename(image00_data_path))[0])
 
         raw_dataset:Dict[str, Union[str, Tuple[str, int, int]]] = {}
 
@@ -218,8 +218,7 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
 
     data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', 'train', config[CONFIG_SEQUENCE_DIR])
 
-    print(len(image00data_paths), len(image01data_paths))
-    print(len(image00_timestamps), len(image01_timestamps))
+    print(len(raw_data_dict))
 
     data_group:h5py.Group = dst_h5.get_next_data_group()
 
@@ -241,8 +240,8 @@ def main():
     
     h5file:H5Dataset = H5Dataset(config[CONFIG_HDF5_PATH])
 
-    data_group:h5py.Group = h5file.get_next_data_group()
-    # create_sequential_data(config, h5file)
+    # data_group:h5py.Group = h5file.get_next_data_group()
+    create_sequential_data(config, h5file)
     
     create_intrinsic(config, h5file)
 
