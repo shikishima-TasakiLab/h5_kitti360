@@ -2,13 +2,14 @@ import argparse
 from typing import Dict, Union
 import os
 from datetime import datetime
+import cv2
 import numpy as np
 import h5py
 from glob import glob
 from pointsmap import *
 from h5datacreator import *
 
-from .io import PlyData
+from .io import PlyData, SickData, VelodyneData
 from .constant import *
 
 def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
@@ -19,7 +20,9 @@ def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     
     points = Points(quiet=True)
 
-    for ply_path in poly_paths:
+    for itr, ply_path in enumerate(poly_paths):
+        print('SemanticMap {0:010d}'.format(itr))
+        print('Ply      :', ply_path)
         ply:PlyData = PlyData(ply_path)
         ply_data:np.ndarray = ply.data[PLY_ELEMENT_VERTEX]
         ply_points:np.ndarray = np.stack([ply_data['x'], ply_data['y'], ply_data['z']], axis=1)
@@ -40,6 +43,7 @@ def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
 
     map_group = dst_h5.get_common_group('map')
     set_semantic3d(map_group, 'map', points_np, semantic1d_np, FRAMEID_WORLD, LABEL_TAG, map_id='Seq{0:04d}'.format(config[CONFIG_SEQUENCE]))
+    print('Done')
 
 def create_labelconfig(dst_h5:H5Dataset):
     label_group = dst_h5.get_label_group(LABEL_TAG)
@@ -169,6 +173,8 @@ def convert_timestamp(timestamp:str) -> Tuple[int, int]:
 def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     data2dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_raw', config[CONFIG_SEQUENCE_DIR])
     data3dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_3d_raw', config[CONFIG_SEQUENCE_DIR])
+    data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', 'train', config[CONFIG_SEQUENCE_DIR])
+    dataPoses_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_poses', config[CONFIG_SEQUENCE_DIR])
 
     image00data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, DIR_DATA_RECT, '*.png')))
     image01data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, DIR_DATA_RECT, '*.png')))
@@ -187,16 +193,19 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     sick_timestamps:List[str]
     with open(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, 'timestamps.txt'), mode='r') as f:
         sick_timestamps = f.readlines()
+    oxts_timestamps:List[str]
+    with open(os.path.join(dataPoses_seq_dir, DIR_OXTS, 'timestamps.txt'), mode='r') as f:
+        oxts_timestamps = f.readlines()
     
-    raw_data_dict:Dict[str, Dict[str, Union[str, Tuple[str, int, int]]]] = {}
+    raw_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
     for image00_data_path, image01_data_path, velodyne_data_path, sick_data_path, \
-        image00_timestamp, image01_timestamp, velodyne_timestamp, sick_timestamp \
+        image00_timestamp, image01_timestamp, velodyne_timestamp, sick_timestamp, oxts_timestamp \
         in zip(image00data_paths, image01data_paths, velodyne_data_paths, sick_data_paths, \
-            image00_timestamps, image01_timestamps, velodyne_timestamps, sick_timestamps):
+            image00_timestamps, image01_timestamps, velodyne_timestamps, sick_timestamps, oxts_timestamps):
 
-        key = int(os.path.splitext(os.path.basename(image00_data_path))[0])
+        key = str(int(os.path.splitext(os.path.basename(image00_data_path))[0]))
 
-        raw_dataset:Dict[str, Union[str, Tuple[str, int, int]]] = {}
+        raw_dataset:Dict[str, Tuple[str, int, int]] = {}
 
         image00_sec, image00_nsec = convert_timestamp(image00_timestamp)
         raw_dataset[DIR_IMAGE00] = (image00_data_path, image00_sec, image00_nsec)
@@ -210,13 +219,96 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         sick_sec, sick_nsec = convert_timestamp(sick_timestamp)
         raw_dataset[DIR_SICK_POINTS] = (sick_data_path, sick_sec, sick_nsec)
 
-        raw_data_dict[str(key)] = raw_dataset
+        oxts_sec, oxts_nsec = convert_timestamp(oxts_timestamp)
+        raw_dataset[DIR_OXTS] = ('', oxts_sec, oxts_nsec)
 
-    data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', 'train', config[CONFIG_SEQUENCE_DIR])
+        raw_data_dict[key] = raw_dataset
 
-    print(len(raw_data_dict))
+    semanticData_paths:List[str] = sorted(glob(os.path.join(data2dSemantic_seq_dir, DIR_SEMANTIC, '*.png')))
+    semantic_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
+    for semanticData_path in semanticData_paths:
+        key = str(int(os.path.splitext(os.path.basename(semanticData_path))[0]))
+        if key not in raw_data_dict.keys(): continue
 
-    data_group:h5py.Group = dst_h5.get_next_data_group()
+        semantic_dataset:Dict[str, Tuple[str, int, int]] = raw_data_dict[key].copy()
+        semantic_dataset[DIR_SEMANTIC] = (semanticData_path, 0, 0)
+
+        semantic_data_dict[key] = semantic_dataset
+
+    del raw_data_dict
+
+    pose_data_dict:Dict[str, Dict[str, Union[Tuple[str, int, int], Tuple[np.ndarray, np.ndarray]]]] = {}
+    with open(os.path.join(dataPoses_seq_dir, 'poses.txt'), mode='r') as f:
+        line:str = f.readline()
+        while line:
+            values:List[str] = line.split()
+            key = values[0]
+            if key not in semantic_data_dict.keys():
+                line:str = f.readline()
+                continue
+            pose_dataset:Dict[str, Union[Tuple[str, int, int], Tuple[np.ndarray, np.ndarray]]] = semantic_data_dict[key].copy()
+            matrix:np.ndarray = np.identity(4, dtype=np.float32)
+            matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
+            # translation, quaternion = matrix2quaternion(matrix)
+            pose_dataset['world_to_pose'] = matrix2quaternion(matrix)
+
+            pose_data_dict[key] = pose_dataset
+
+            line:str = f.readline()
+
+    del semantic_data_dict
+
+    success:bool = True
+    for key, item in pose_data_dict.items():
+        if success is True:
+            data_group:h5py.Group = dst_h5.get_next_data_group()
+        else:
+            data_group:h5py.Group = dst_h5.get_current_data_group()
+
+        image00_data_path, image00_sec, image00_nsec = item[DIR_IMAGE00]
+        image00_data:np.ndarray = cv2.imread(image00_data_path, cv2.IMREAD_ANYCOLOR)
+        if image00_data is None:
+            success = False
+            continue
+
+        semantic_data_path, _, _ = item[DIR_SEMANTIC]
+        semantic_data:np.ndarray = cv2.imread(semantic_data_path, cv2.IMREAD_UNCHANGED)
+        if semantic_data is None:
+            success = False
+            continue
+
+        image01_data_path, image01_sec, image01_nsec = item[DIR_IMAGE01]
+        image01_data:np.ndarray = cv2.imread(image01_data_path, cv2.IMREAD_ANYCOLOR)
+        if image01_data is None:
+            success = False
+            continue
+
+        velodyne_data_path, velodyne_sec, velodyne_nsec = item[DIR_VELODYNE_POINTS]
+        velodyne_data_instance = VelodyneData(velodyne_data_path)
+        velodyne_data_raw:np.ndarray = velodyne_data_instance.data
+
+        sick_data_path, sick_sec, sick_nsec = item[DIR_SICK_POINTS]
+        sick_data_instance = SickData(sick_data_path)
+        sick_data_raw:np.ndarray = sick_data_instance.data
+
+        oxts_data_path, oxts_sec, oxts_nsec = item[DIR_OXTS]
+
+        world2pose_tr, world2pose_q = item['world_to_pose']
+
+        set_bgr8(data_group, DIR_IMAGE00, image00_data, FRAMEID_CAM0, image00_sec, image00_nsec)
+        set_bgr8(data_group, DIR_IMAGE01, image01_data, FRAMEID_CAM1, image01_sec, image01_nsec)
+        set_semantic2d(data_group, DIR_SEMANTIC, semantic_data, FRAMEID_CAM0, LABEL_TAG, image00_sec, image00_nsec)
+        set_points(data_group, DIR_VELODYNE_POINTS, np.stack([velodyne_data_raw['x'], velodyne_data_raw['y'], velodyne_data_raw['z']], axis=1), FRAMEID_VELODYNE, velodyne_sec, velodyne_nsec)
+        set_points(data_group, DIR_SICK_POINTS, np.stack([np.zeros_like(sick_data_raw['y']), sick_data_raw['y'], sick_data_raw['z']], axis=1), FRAMEID_SICK, sick_sec, sick_nsec)
+        set_pose(data_group, 'world_to_pose', world2pose_tr, world2pose_q, FRAMEID_WORLD, FRAMEID_POSE, oxts_sec, oxts_nsec)
+
+        success = True
+        print('SequentialData {0:010d}'.format(dst_h5.get_current_data_index()))
+        print('image00  :', image00_data_path)
+        print('image01  :', image01_data_path)
+        print('semantic :', semantic_data_path)
+        print('velodyne :', velodyne_data_path)
+        print('sick     :', sick_data_path)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -243,7 +335,7 @@ def main():
 
     create_static_transforms(config, h5file)
 
-    # create_semanticsmap(config, h5file)
+    create_semanticsmap(config, h5file)
     create_labelconfig(h5file)
     
     h5file.close()
