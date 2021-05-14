@@ -132,22 +132,18 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
             if values[0] == 'image_00:':
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
-                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
                 set_pose(transforms_group, 'pose_to_cam0', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM0)
             elif values[0] == 'image_01:':
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
-                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
                 set_pose(transforms_group, 'pose_to_cam1', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM1)
             elif values[0] == 'image_02:':
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
-                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
                 set_pose(transforms_group, 'pose_to_cam2', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM2)
             elif values[0] == 'image_03:':
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
-                translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
                 set_pose(transforms_group, 'pose_to_cam3', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM3)
             line:str = f.readline()
     
@@ -156,6 +152,7 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         matrix:np.ndarray = np.identity(4, dtype=np.float32)
         matrix[0:3, :] = np.reshape(np.float32(values[0:12]), (3, 4))
         translation, quaternion = matrix2quaternion(matrix)
+        translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
         set_pose(transforms_group, 'cam0_to_velo', translation, quaternion, FRAMEID_CAM0, FRAMEID_VELODYNE)
     
     with open(os.path.join(calibration_dir, 'calib_sick_to_velo.txt'), mode='r') as f:
@@ -163,7 +160,6 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         matrix:np.ndarray = np.identity(4, dtype=np.float32)
         matrix[0:3, :] = np.reshape(np.float32(values[0:12]), (3, 4))
         translation, quaternion = matrix2quaternion(matrix)
-        translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
         set_pose(transforms_group, 'velo_to_sick', translation, quaternion, FRAMEID_VELODYNE, FRAMEID_SICK)
 
 def convert_timestamp(timestamp:str) -> Tuple[int, int]:
