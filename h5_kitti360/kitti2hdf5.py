@@ -43,7 +43,7 @@ def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
 
     map_group = dst_h5.get_common_group('map')
     set_semantic3d(map_group, 'map', points_np, semantic1d_np, FRAMEID_WORLD, LABEL_TAG, map_id='Seq{0:04d}'.format(config[CONFIG_SEQUENCE]))
-    print('Done')
+    print('SemanticMap Done')
 
 def create_labelconfig(dst_h5:H5Dataset):
     label_group = dst_h5.get_label_group(LABEL_TAG)
