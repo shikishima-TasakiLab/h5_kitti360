@@ -9,7 +9,7 @@ from glob import glob
 from pointsmap import *
 from h5datacreator import *
 
-from .io import PlyData, SickData, VelodyneData
+from .io import OxtsData, PlyData, SickData, VelodyneData
 from .constant import *
 
 def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
@@ -137,18 +137,22 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
                 set_pose(transforms_group, 'pose_to_cam0', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM0)
+                set_pose(transforms_group, 'oxts_pose_to_cam0', translation, quaternion, FRAMEID_OXTS_POSE, FRAMEID_OXTS_CAM0)
             elif values[0] == 'image_01:':
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
                 set_pose(transforms_group, 'pose_to_cam1', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM1)
+                set_pose(transforms_group, 'oxts_pose_to_cam1', translation, quaternion, FRAMEID_OXTS_POSE, FRAMEID_OXTS_CAM1)
             elif values[0] == 'image_02:':
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
                 set_pose(transforms_group, 'pose_to_cam2', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM2)
+                set_pose(transforms_group, 'oxts_pose_to_cam2', translation, quaternion, FRAMEID_OXTS_POSE, FRAMEID_OXTS_CAM2)
             elif values[0] == 'image_03:':
                 matrix[0:3, :] = np.reshape(np.float32(values[1:13]), (3, 4))
                 translation, quaternion = matrix2quaternion(matrix)
                 set_pose(transforms_group, 'pose_to_cam3', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM3)
+                set_pose(transforms_group, 'oxts_pose_to_cam3', translation, quaternion, FRAMEID_OXTS_POSE, FRAMEID_OXTS_CAM3)
             line:str = f.readline()
     
     with open(os.path.join(calibration_dir, 'calib_cam_to_velo.txt'), mode='r') as f:
@@ -158,6 +162,7 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         translation, quaternion = matrix2quaternion(matrix)
         translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
         set_pose(transforms_group, 'cam0_to_velo', translation, quaternion, FRAMEID_CAM0, FRAMEID_VELODYNE)
+        set_pose(transforms_group, 'oxts_cam0_to_velo', translation, quaternion, FRAMEID_OXTS_CAM0, FRAMEID_OXTS_VELODYNE)
     
     with open(os.path.join(calibration_dir, 'calib_sick_to_velo.txt'), mode='r') as f:
         values:List[str] = f.readline().split()
@@ -165,6 +170,7 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         matrix[0:3, :] = np.reshape(np.float32(values[0:12]), (3, 4))
         translation, quaternion = matrix2quaternion(matrix)
         set_pose(transforms_group, 'velo_to_sick', translation, quaternion, FRAMEID_VELODYNE, FRAMEID_SICK)
+        set_pose(transforms_group, 'oxts_velo_to_sick', translation, quaternion, FRAMEID_OXTS_VELODYNE, FRAMEID_OXTS_SICK)
 
 def convert_timestamp(timestamp:str) -> Tuple[int, int]:
     sec_str, nsec_str = timestamp.split('.')
@@ -180,6 +186,7 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     image01data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, DIR_DATA_RECT, '*.png')))
     velodyne_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, DIR_DATA, '*.bin')))
     sick_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, DIR_DATA, '*.bin')))
+    oxts_data_paths:List[str] = sorted(glob(os.path.join(dataPoses_seq_dir, DIR_OXTS, DIR_DATA, '*.txt')))
 
     image00_timestamps:List[str]
     with open(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, 'timestamps.txt'), mode='r') as f:
@@ -198,9 +205,9 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         oxts_timestamps = f.readlines()
     
     raw_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
-    for image00_data_path, image01_data_path, velodyne_data_path, sick_data_path, \
+    for image00_data_path, image01_data_path, velodyne_data_path, sick_data_path, oxts_data_path, \
         image00_timestamp, image01_timestamp, velodyne_timestamp, sick_timestamp, oxts_timestamp \
-        in zip(image00data_paths, image01data_paths, velodyne_data_paths, sick_data_paths, \
+        in zip(image00data_paths, image01data_paths, velodyne_data_paths, sick_data_paths, oxts_data_paths, \
             image00_timestamps, image01_timestamps, velodyne_timestamps, sick_timestamps, oxts_timestamps):
 
         key = str(int(os.path.splitext(os.path.basename(image00_data_path))[0]))
@@ -220,7 +227,7 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         raw_dataset[DIR_SICK_POINTS] = (sick_data_path, sick_sec, sick_nsec)
 
         oxts_sec, oxts_nsec = convert_timestamp(oxts_timestamp)
-        raw_dataset[DIR_OXTS] = ('', oxts_sec, oxts_nsec)
+        raw_dataset[DIR_OXTS] = (oxts_data_path, oxts_sec, oxts_nsec)
 
         raw_data_dict[key] = raw_dataset
 
@@ -292,6 +299,9 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         sick_data_raw:np.ndarray = sick_data_instance.data
 
         oxts_data_path, oxts_sec, oxts_nsec = item[DIR_OXTS]
+        oxts_data_instance = OxtsData(oxts_data_path)
+        oxts_tr:np.ndarray = oxts_data_instance.data[SUBTYPE_TRANSLATION]
+        oxts_q:np.ndarray = oxts_data_instance.data[SUBTYPE_ROTATION]
 
         world2pose_tr, world2pose_q = item['world_to_pose']
 
@@ -301,6 +311,7 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         set_points(data_group, DIR_VELODYNE_POINTS, np.stack([velodyne_data_raw['x'], velodyne_data_raw['y'], velodyne_data_raw['z']], axis=1), FRAMEID_VELODYNE, velodyne_sec, velodyne_nsec)
         set_points(data_group, DIR_SICK_POINTS, np.stack([np.zeros_like(sick_data_raw['y']), sick_data_raw['y'], sick_data_raw['z']], axis=1), FRAMEID_SICK, sick_sec, sick_nsec)
         set_pose(data_group, 'world_to_pose', world2pose_tr, world2pose_q, FRAMEID_WORLD, FRAMEID_POSE, oxts_sec, oxts_nsec)
+        set_pose(data_group, 'oxts', oxts_tr, oxts_q, FRAMEID_WORLD, FRAMEID_OXTS_POSE, oxts_sec, oxts_nsec)
 
         success = True
         print('SequentialData {0:010d}'.format(dst_h5.get_current_data_index()))
@@ -328,7 +339,6 @@ def main():
     
     h5file:H5Dataset = H5Dataset(config[CONFIG_HDF5_PATH])
 
-    # data_group:h5py.Group = h5file.get_next_data_group()
     create_sequential_data(config, h5file)
     
     create_intrinsic(config, h5file)

@@ -1,7 +1,9 @@
 
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union
 import numpy as np
+from scipy.spatial.transform import Rotation
+from h5datacreator.structure import SUBTYPE_ROTATION, SUBTYPE_TRANSLATION
 
 PLY_PROPERTIES_DTYPE = {
     'char': 'i1',
@@ -24,6 +26,9 @@ PLY_PROPERTIES_BYTES = {
     'float': 4,
     'double': 8
 }
+
+EARTH_RADIUS:float = 6378137.   # [m]
+ORIGIN_OXTS:List[float] = [48.9843445, 8.4295857]
 
 class PlyData():
     ply_format:str = ''
@@ -103,6 +108,67 @@ class SickData():
         self.data = np.fromfile(file_path, dtype=self.dtype)
         self.data['y'] = -self.data['y']
 
+class OxtsData():
+    def __init__(self, file_path:str) -> None:
+        self.data:Dict[str, Union[int, float, np.ndarray]] = {}
+        self.load(file_path)
+
+    def load(self, file_path:str) -> None:
+        if os.path.isfile(file_path) is False:
+            raise FileNotFoundError('File not found : {0}'.format(file_path))
+        with open(file_path, mode='r') as f:
+            values:List[str] = f.read().split()
+        self.lat = float(values[0])             # [deg]
+        self.lon = float(values[1])             # [deg]
+        self.alt = float(values[2])             # [m]
+        self.roll = float(values[3])            # [rad]
+        self.pitch = float(values[4])           # [rad]
+        self.yaw = float(values[5])             # [rad]
+        self.vn = float(values[6])              # [m/s]
+        self.ve = float(values[7])              # [m/s]
+        self.vf = float(values[8])              # [m/s]
+        self.vl = float(values[9])              # [m/s]
+        self.vu = float(values[10])             # [m/s]
+        self.ax = float(values[11])             # [m/s/s]
+        self.ay = float(values[12])             # [m/s/s]
+        self.az = float(values[13])             # [m/s/s]
+        self.af = float(values[14])             # [m/s/s]
+        self.al = float(values[15])             # [m/s/s]
+        self.au = float(values[16])             # [m/s/s]
+        self.wx = float(values[17])             # [rad/s]
+        self.wy = float(values[18])             # [rad/s]
+        self.wz = float(values[19])             # [rad/s]
+        self.wf = float(values[20])             # [rad/s]
+        self.wl = float(values[21])             # [rad/s]
+        self.wu = float(values[22])             # [rad/s]
+        self.pos_accuracy = float(values[23])   # [north/east in m]
+        self.vel_accuracy = float(values[24])   # [north/east in m/s]
+        self.navstat = int(values[25])
+        self.numsats = int(values[26])
+        self.posmode = int(values[27])
+        self.velmode = int(values[28])
+        self.orimode = int(values[29])
+        del values
+
+        scale = self.__lat2scale(ORIGIN_OXTS[0])
+        ox, oy = self.__latlon2mercator(ORIGIN_OXTS[0], ORIGIN_OXTS[1], scale)
+        origin = np.array([ox, oy, 0.])
+
+        tx, ty = self.__latlon2mercator(self.lat, self.lon, scale)
+        self.data[SUBTYPE_TRANSLATION] = np.array([tx, ty, self.alt]) - origin
+
+        rot:Rotation = Rotation.from_euler('zyx', [self.yaw, self.pitch, self.roll])
+        self.data[SUBTYPE_ROTATION] = rot.as_quat()
+    
+    def __lat2scale(self, lat) -> float:
+        return np.cos(lat * np.pi / 180.)
+    
+    def __latlon2mercator(self, lat, lon, scale) -> Tuple[float, float]:
+        mx = scale * lon * np.pi * EARTH_RADIUS / 180.
+        my = scale * EARTH_RADIUS * np.log(np.tan((90. + lat) * np.pi / 360.))
+        return mx, my
+
+
 if __name__=='__main__':
     # pd = PlyData('/data/KITTI-360/data_3d_semantics/2013_05_28_drive_0000_sync/static/000002_000385.ply')
     # print(pd.ply_version)
@@ -111,9 +177,11 @@ if __name__=='__main__':
     # print(pd.properties_dtype)
     # print(pd.properties_bytes)
     # print(pd.data)
-    vd = VelodyneData('/data/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/velodyne_points/data/0000000000.bin')
-    print(vd.data.shape)
-    print(vd.data.dtype)
-    sd = SickData('/data/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/sick_points/data/0000000000.bin')
-    print(sd.data.shape)
-    print(sd.data.dtype)
+    # vd = VelodyneData('/data/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/velodyne_points/data/0000000000.bin')
+    # print(vd.data.shape)
+    # print(vd.data.dtype)
+    # sd = SickData('/data/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/sick_points/data/0000000000.bin')
+    # print(sd.data.shape)
+    # print(sd.data.dtype)
+    oxts = OxtsData('/data/KITTI-360/data_poses/2013_05_28_drive_0000_sync/oxts/data/0000000000.txt')
+    print(oxts.data)

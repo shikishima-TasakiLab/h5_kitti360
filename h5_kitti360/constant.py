@@ -11,6 +11,13 @@ FRAMEID_CAM2:str = 'cam2'
 FRAMEID_CAM3:str = 'cam3'
 FRAMEID_VELODYNE:str = 'velodyne'
 FRAMEID_SICK:str = 'sick'
+FRAMEID_OXTS_POSE:str = 'oxts_pose'
+FRAMEID_OXTS_CAM0:str = 'oxts_cam0'
+FRAMEID_OXTS_CAM1:str = 'oxts_cam1'
+FRAMEID_OXTS_CAM2:str = 'oxts_cam2'
+FRAMEID_OXTS_CAM3:str = 'oxts_cam3'
+FRAMEID_OXTS_VELODYNE:str = 'oxts_velodyne'
+FRAMEID_OXTS_SICK:str = 'oxts_sick'
 
 LABEL_TAG:str = 'kitti360'
 
