@@ -182,67 +182,122 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', 'train', config[CONFIG_SEQUENCE_DIR])
     dataPoses_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_poses', config[CONFIG_SEQUENCE_DIR])
 
-    image00data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, DIR_DATA_RECT, '*.png')))
-    image01data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, DIR_DATA_RECT, '*.png')))
-    velodyne_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, DIR_DATA, '*.bin')))
-    sick_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, DIR_DATA, '*.bin')))
-    oxts_data_paths:List[str] = sorted(glob(os.path.join(dataPoses_seq_dir, DIR_OXTS, DIR_DATA, '*.txt')))
 
+    image00data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, DIR_DATA_RECT, '*.png')))
     image00_timestamps:List[str]
     with open(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, 'timestamps.txt'), mode='r') as f:
         image00_timestamps = f.readlines()
+
+    image00_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
+    for image00_data_path, image00_timestamp in zip(image00data_paths, image00_timestamps):
+        key = str(int(os.path.splitext(os.path.basename(image00_data_path))[0]))
+
+        image00_dataset:Dict[str, Tuple[str, int, int]] = {}
+
+        image00_sec, image00_nsec = convert_timestamp(image00_timestamp)
+        image00_dataset[DIR_IMAGE00] = (image00_data_path, image00_sec, image00_nsec)
+
+        image00_data_dict[key] = image00_dataset
+
+
+    image01data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, DIR_DATA_RECT, '*.png')))
     image01_timestamps:List[str]
     with open(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, 'timestamps.txt'), mode='r') as f:
         image01_timestamps = f.readlines()
+
+    image01_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
+    for image01_data_path, image01_timestamp in zip(image01data_paths, image01_timestamps):
+        key = str(int(os.path.splitext(os.path.basename(image01_data_path))[0]))
+        if key not in image00_data_dict.keys(): continue
+
+        image01_dataset:Dict[str, Tuple[str, int, int]] = image00_data_dict[key].copy()
+
+        image01_sec, image01_nsec = convert_timestamp(image01_timestamp)
+        image01_dataset[DIR_IMAGE01] = (image01_data_path, image01_sec, image01_nsec)
+
+        image01_data_dict[key] = image01_dataset
+
+
+    del image00_data_dict
+
+
+    velodyne_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, DIR_DATA, '*.bin')))
     velodyne_timestamps:List[str]
     with open(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, 'timestamps.txt'), mode='r') as f:
         velodyne_timestamps = f.readlines()
+
+    velodyne_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
+    for velodyne_data_path, velodyne_timestamp in zip(velodyne_data_paths, velodyne_timestamps):
+        key = str(int(os.path.splitext(os.path.basename(velodyne_data_path))[0]))
+        if key not in image01_data_dict.keys(): continue
+
+        velodyne_dataset:Dict[str, Tuple[str, int, int]] = image01_data_dict[key].copy()
+
+        velodyne_sec, velodyne_nsec = convert_timestamp(velodyne_timestamp)
+        velodyne_dataset[DIR_VELODYNE_POINTS] = (velodyne_data_path, velodyne_sec, velodyne_nsec)
+
+        velodyne_data_dict[key] = velodyne_dataset
+
+
+    del image01_data_dict
+
+
+    sick_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, DIR_DATA, '*.bin')))
     sick_timestamps:List[str]
     with open(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, 'timestamps.txt'), mode='r') as f:
         sick_timestamps = f.readlines()
+
+    sick_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
+    for sick_data_path, sick_timestamp in zip(sick_data_paths, sick_timestamps):
+        key = str(int(os.path.splitext(os.path.basename(sick_data_path))[0]))
+        if key not in velodyne_data_dict.keys(): continue
+
+        sick_dataset:Dict[str, Tuple[str, int, int]] = velodyne_data_dict[key].copy()
+
+        sick_sec, sick_nsec = convert_timestamp(sick_timestamp)
+        sick_dataset[DIR_SICK_POINTS] = (sick_data_path, sick_sec, sick_nsec)
+
+        sick_data_dict[key] = sick_dataset
+
+
+    del velodyne_data_dict
+
+
+    oxts_data_paths:List[str] = sorted(glob(os.path.join(dataPoses_seq_dir, DIR_OXTS, DIR_DATA, '*.txt')))
     oxts_timestamps:List[str]
     with open(os.path.join(dataPoses_seq_dir, DIR_OXTS, 'timestamps.txt'), mode='r') as f:
         oxts_timestamps = f.readlines()
-    
-    raw_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
-    for image00_data_path, image01_data_path, velodyne_data_path, sick_data_path, oxts_data_path, \
-        image00_timestamp, image01_timestamp, velodyne_timestamp, sick_timestamp, oxts_timestamp \
-        in zip(image00data_paths, image01data_paths, velodyne_data_paths, sick_data_paths, oxts_data_paths, \
-            image00_timestamps, image01_timestamps, velodyne_timestamps, sick_timestamps, oxts_timestamps):
 
-        key = str(int(os.path.splitext(os.path.basename(image00_data_path))[0]))
+    oxts_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
+    for oxts_data_path, oxts_timestamp in zip(oxts_data_paths, oxts_timestamps):
+        key = str(int(os.path.splitext(os.path.basename(oxts_data_path))[0]))
+        if key not in sick_data_dict.keys(): continue
 
-        raw_dataset:Dict[str, Tuple[str, int, int]] = {}
-
-        image00_sec, image00_nsec = convert_timestamp(image00_timestamp)
-        raw_dataset[DIR_IMAGE00] = (image00_data_path, image00_sec, image00_nsec)
-
-        image01_sec, image01_nsec = convert_timestamp(image01_timestamp)
-        raw_dataset[DIR_IMAGE01] = (image01_data_path, image01_sec, image01_nsec)
-
-        velodyne_sec, velodyne_nsec = convert_timestamp(velodyne_timestamp)
-        raw_dataset[DIR_VELODYNE_POINTS] = (velodyne_data_path, velodyne_sec, velodyne_nsec)
-
-        sick_sec, sick_nsec = convert_timestamp(sick_timestamp)
-        raw_dataset[DIR_SICK_POINTS] = (sick_data_path, sick_sec, sick_nsec)
+        oxts_dataset:Dict[str, Tuple[str, int, int]] = sick_data_dict[key].copy()
 
         oxts_sec, oxts_nsec = convert_timestamp(oxts_timestamp)
-        raw_dataset[DIR_OXTS] = (oxts_data_path, oxts_sec, oxts_nsec)
+        oxts_dataset[DIR_OXTS] = (oxts_data_path, oxts_sec, oxts_nsec)
 
-        raw_data_dict[key] = raw_dataset
+        oxts_data_dict[key] = oxts_dataset
+
+
+    del sick_data_dict
+
 
     semanticData_paths:List[str] = sorted(glob(os.path.join(data2dSemantic_seq_dir, DIR_SEMANTIC, '*.png')))
     semantic_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
     for semanticData_path in semanticData_paths:
         key = str(int(os.path.splitext(os.path.basename(semanticData_path))[0]))
-        if key not in raw_data_dict.keys(): continue
+        if key not in oxts_data_dict.keys(): continue
 
-        semantic_dataset:Dict[str, Tuple[str, int, int]] = raw_data_dict[key].copy()
+        semantic_dataset:Dict[str, Tuple[str, int, int]] = oxts_data_dict[key].copy()
         semantic_dataset[DIR_SEMANTIC] = (semanticData_path, 0, 0)
 
         semantic_data_dict[key] = semantic_dataset
 
-    del raw_data_dict
+
+    del oxts_data_dict
+
 
     pose_data_dict:Dict[str, Dict[str, Union[Tuple[str, int, int], Tuple[np.ndarray, np.ndarray]]]] = {}
     with open(os.path.join(dataPoses_seq_dir, 'poses.txt'), mode='r') as f:
