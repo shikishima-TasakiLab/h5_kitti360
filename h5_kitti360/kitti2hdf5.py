@@ -320,6 +320,7 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         print('semantic :', semantic_data_path)
         print('velodyne :', velodyne_data_path)
         print('sick     :', sick_data_path)
+        print('oxts     :', oxts_data_path)
 
 def main():
     parser = argparse.ArgumentParser()
