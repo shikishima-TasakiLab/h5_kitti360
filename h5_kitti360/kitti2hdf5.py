@@ -351,5 +351,7 @@ def main():
     
     h5file.close()
 
+    print('Saved "{0}"'.format(config[CONFIG_HDF5_PATH]))
+
 if __name__=='__main__':
     main()
