@@ -157,7 +157,10 @@ class OxtsData():
         tx, ty = self.__latlon2mercator(self.lat, self.lon, scale)
         self.data[SUBTYPE_TRANSLATION] = np.array([tx, ty, self.alt]) - origin
 
-        rot:Rotation = Rotation.from_euler('zyx', [self.yaw, self.pitch, self.roll])
+        rz = Rotation.from_euler('z', self.yaw)
+        ry = Rotation.from_euler('y', self.pitch)
+        rx = Rotation.from_euler('x', self.roll)
+        rot:Rotation = rz * ry * rx * Rotation.from_quat([1.0, 0.0, 0.0, 0.0])
         self.data[SUBTYPE_ROTATION] = rot.as_quat()
     
     def __lat2scale(self, lat) -> float:
@@ -183,5 +186,6 @@ if __name__=='__main__':
     # sd = SickData('/data/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/sick_points/data/0000000000.bin')
     # print(sd.data.shape)
     # print(sd.data.dtype)
-    oxts = OxtsData('/data/KITTI-360/data_poses/2013_05_28_drive_0000_sync/oxts/data/0000000000.txt')
+    oxts = OxtsData('/data/KITTI-360/data_poses/2013_05_28_drive_0000_sync/oxts/data/0000000140.txt')
     print(oxts.data)
+    print(oxts.roll, oxts.pitch, oxts.yaw)

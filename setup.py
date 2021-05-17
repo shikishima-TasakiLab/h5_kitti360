@@ -3,8 +3,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='h5dataviewer',
-    version='0.1.1',
+    name='h5_kitti360',
+    version='0.1.0',
     description='`http://git-docker.tasakilab:5050/shikishima/h5_kitti360`',
     long_description='`http://git-docker.tasakilab:5050/shikishima/h5_kitti360`',
     author='Junya Shikishima',
@@ -13,10 +13,11 @@ setup(
     license='',
     packages=find_packages(),
     install_requires=[
-        "numpy", "h5py"
+        "numpy", "h5py", "scipy", "pointsmap"
     ],
     entry_points={
         'console_scripts': [
+            'kitti2hdf5 = h5_kitti360.kitti2hdf5:main'
         ]
     },
     python_requires='>=3.6'
