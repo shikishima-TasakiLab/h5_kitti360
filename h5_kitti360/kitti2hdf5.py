@@ -40,9 +40,19 @@ def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     # points.downsampling(VOXELGRIDFILTER_LEAFSIZE)
 
     points_np, semantic1d_np = points.get_semanticpoints()
+    del points
+
+    vgm = VoxelGridMap(quiet=True)
+    vgm.set_semanticmap(points_np, semantic1d_np)
+    vgm_np = vgm.get_voxelgridmap()
+    vgm_size = vgm.get_voxel_size()
+    vgm_min = vgm.get_voxels_min()
+    vgm_max = vgm.get_voxels_max()
+    vgm_center = vgm.get_voxels_center()
+    vgm_origin = vgm.get_voxels_origin()
 
     map_group = dst_h5.get_common_group('map')
-    set_semantic3d(map_group, 'map', points_np, semantic1d_np, FRAMEID_WORLD, LABEL_TAG, map_id='Seq{0:04d}'.format(config[CONFIG_SEQUENCE]))
+    set_voxelgridmap(map_group, 'map', vgm_np, FRAMEID_WORLD, vgm_size, vgm_min, vgm_max, vgm_center, vgm_origin, LABEL_TAG, map_id='Seq{0:04d}'.format(config[CONFIG_SEQUENCE]))
     print('SemanticMap Done')
 
 def create_labelconfig(dst_h5:H5Dataset):
@@ -173,8 +183,11 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         set_pose(transforms_group, 'oxts_velo_to_sick', translation, quaternion, FRAMEID_OXTS_VELODYNE, FRAMEID_OXTS_SICK)
 
 def convert_timestamp(timestamp:str) -> Tuple[int, int]:
-    sec_str, nsec_str = timestamp.split('.')
-    return int(datetime.strptime(sec_str, '%Y-%m-%d %H:%M:%S').timestamp()), int(nsec_str)
+    time_str_list = timestamp.split('.')
+    if len(time_str_list) != 2:
+        return None
+    else:
+        return int(datetime.strptime(time_str_list[0], '%Y-%m-%d %H:%M:%S').timestamp()), int(time_str_list[1])
 
 def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     data2dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_raw', config[CONFIG_SEQUENCE_DIR])
@@ -230,12 +243,11 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     for velodyne_data_path, velodyne_timestamp in zip(velodyne_data_paths, velodyne_timestamps):
         key = str(int(os.path.splitext(os.path.basename(velodyne_data_path))[0]))
         if key not in image01_data_dict.keys(): continue
+        velodyne_time_tuple = convert_timestamp(velodyne_timestamp)
+        if velodyne_time_tuple is None: continue
 
         velodyne_dataset:Dict[str, Tuple[str, int, int]] = image01_data_dict[key].copy()
-
-        velodyne_sec, velodyne_nsec = convert_timestamp(velodyne_timestamp)
-        velodyne_dataset[DIR_VELODYNE_POINTS] = (velodyne_data_path, velodyne_sec, velodyne_nsec)
-
+        velodyne_dataset[DIR_VELODYNE_POINTS] = (velodyne_data_path, velodyne_time_tuple[0], velodyne_time_tuple[1])
         velodyne_data_dict[key] = velodyne_dataset
 
 
@@ -251,11 +263,11 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     for sick_data_path, sick_timestamp in zip(sick_data_paths, sick_timestamps):
         key = str(int(os.path.splitext(os.path.basename(sick_data_path))[0]))
         if key not in velodyne_data_dict.keys(): continue
+        sick_time_tuple:Tuple[int, int] = convert_timestamp(sick_timestamp)
+        if sick_time_tuple is None: continue
 
         sick_dataset:Dict[str, Tuple[str, int, int]] = velodyne_data_dict[key].copy()
-
-        sick_sec, sick_nsec = convert_timestamp(sick_timestamp)
-        sick_dataset[DIR_SICK_POINTS] = (sick_data_path, sick_sec, sick_nsec)
+        sick_dataset[DIR_SICK_POINTS] = (sick_data_path, sick_time_tuple[0], sick_time_tuple[1])
 
         sick_data_dict[key] = sick_dataset
 
@@ -272,12 +284,11 @@ def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     for oxts_data_path, oxts_timestamp in zip(oxts_data_paths, oxts_timestamps):
         key = str(int(os.path.splitext(os.path.basename(oxts_data_path))[0]))
         if key not in sick_data_dict.keys(): continue
+        oxts_time_tuple:Tuple[int, int] = convert_timestamp(oxts_timestamp)
+        if oxts_time_tuple is None: continue
 
         oxts_dataset:Dict[str, Tuple[str, int, int]] = sick_data_dict[key].copy()
-
-        oxts_sec, oxts_nsec = convert_timestamp(oxts_timestamp)
-        oxts_dataset[DIR_OXTS] = (oxts_data_path, oxts_sec, oxts_nsec)
-
+        oxts_dataset[DIR_OXTS] = (oxts_data_path, oxts_time_tuple[0], oxts_time_tuple[1])
         oxts_data_dict[key] = oxts_dataset
 
 
