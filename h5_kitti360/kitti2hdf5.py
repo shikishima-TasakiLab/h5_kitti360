@@ -44,7 +44,7 @@ def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
 
     vgm = VoxelGridMap(quiet=True)
     vgm.set_semanticmap(points_np, semantic1d_np)
-    vgm_np = vgm.get_voxelgridmap()
+    vgm_np = vgm.get_voxel_semantic3d()
     vgm_size = vgm.get_voxel_size()
     vgm_min = vgm.get_voxels_min()
     vgm_max = vgm.get_voxels_max()
@@ -52,7 +52,7 @@ def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
     vgm_origin = vgm.get_voxels_origin()
 
     map_group = dst_h5.get_common_group('map')
-    set_voxelgridmap(map_group, 'map', vgm_np, FRAMEID_WORLD, vgm_size, vgm_min, vgm_max, vgm_center, vgm_origin, LABEL_TAG, map_id='Seq{0:04d}'.format(config[CONFIG_SEQUENCE]))
+    set_voxel_semantic3d(map_group, 'map', vgm_np, FRAMEID_WORLD, vgm_size, vgm_min, vgm_max, vgm_center, vgm_origin, LABEL_TAG, map_id='Seq{0:04d}'.format(config[CONFIG_SEQUENCE]))
     print('SemanticMap Done')
 
 def create_labelconfig(dst_h5:H5Dataset):
