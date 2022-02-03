@@ -9,6 +9,11 @@ The script to convert the [KITTI-360 dataset](http://www.cvlibs.net/datasets/kit
 
 ## Run on Docker (strongly recommended)
 
+1. Install "docker-py".
+    ```bash
+    pip install docker
+    ```
+
 1. Clone this repository with the following command.
     ```bash
     git clone https://github.com/shikishima-TasakiLab/h5_kitti360.git
@@ -21,9 +26,9 @@ The script to convert the [KITTI-360 dataset](http://www.cvlibs.net/datasets/kit
 
 ## Run on Local Environment
 
-1. Install [pointsmap-python](https://github.com/shikishima-TasakiLab/pointsmap-python).
+1. Install "[pointsmap-python](https://github.com/shikishima-TasakiLab/pointsmap-python)".
 
-1. Install [h5datacreator](https://github.com/shikishima-TasakiLab/h5datacreator).
+1. Install "[h5datacreator](https://github.com/shikishima-TasakiLab/h5datacreator)".
 
 1. Install h5_kitti360 with the following command.
     ```bash
