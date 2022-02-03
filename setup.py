@@ -13,7 +13,7 @@ setup(
     license='',
     packages=find_packages(),
     install_requires=[
-        "numpy", "h5py", "scipy", "pointsmap"
+        "numpy", "h5py==2.10.0", "scipy", "pointsmap"
     ],
     entry_points={
         'console_scripts': [

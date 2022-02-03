@@ -12,12 +12,12 @@ from h5datacreator import *
 from .io import OxtsData, PlyData, SickData, VelodyneData
 from .constant import *
 
-def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
+def create_semanticsmap(config:Dict[str, str], dst_h5:H5Dataset):
     search_path = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_3d_semantics', config[CONFIG_SEQUENCE_DIR], 'static', '*.ply')
     poly_paths = glob(search_path)
 
     dynamic_labels:np.ndarray = np.array([24, 25, 26, 27, 28, 29, 30, 31, 32, 33], dtype=np.uint8)
-    
+
     points = Points(quiet=True)
 
     for itr, ply_path in enumerate(poly_paths):
@@ -27,7 +27,7 @@ def create_semanticsmap(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         ply_data:np.ndarray = ply.data[PLY_ELEMENT_VERTEX]
         ply_points:np.ndarray = np.stack([ply_data['x'], ply_data['y'], ply_data['z']], axis=1)
         ply_semantic1d:np.ndarray = np.uint8(ply_data['semantic'])
-        
+
         dynamic_mask:np.ndarray = np.isin(ply_semantic1d, dynamic_labels, invert=True)
 
         tmp_points = Points(quiet=True)
@@ -104,7 +104,7 @@ def create_labelconfig(dst_h5:H5Dataset):
     set_label_config(label_group, 44, 'unknown object'      ,  32,  32,  32)
     set_label_config(label_group, -1, 'license plate'       ,   0,   0, 142)
 
-def create_intrinsic(config:Dict[str, Union[str]], dst_h5:H5Dataset):
+def create_intrinsic(config:Dict[str, str], dst_h5:H5Dataset):
     intrinsic_group:h5py.Group = dst_h5.get_common_group('intrinsic')
     intrinsic_dict:Dict[str, Dict[str, Union[int, float]]] = {DIR_IMAGE00: {H5_ATTR_FRAMEID: FRAMEID_CAM0}, DIR_IMAGE01: {H5_ATTR_FRAMEID: FRAMEID_CAM1}}
 
@@ -129,15 +129,15 @@ def create_intrinsic(config:Dict[str, Union[str]], dst_h5:H5Dataset):
                 intrinsic_dict[DIR_IMAGE01]['Fy'] = float(values[6])
                 intrinsic_dict[DIR_IMAGE01]['Cy'] = float(values[7])
             line = f.readline()
-    
+
     for key, item in intrinsic_dict.items():
         set_intrinsic(intrinsic_group, key, item['Fx'], item['Fy'], item['Cx'], item['Cy'], item['height'], item['width'], item[H5_ATTR_FRAMEID])
 
-def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
+def create_static_transforms(config:Dict[str, str], dst_h5:H5Dataset):
     transforms_group:h5py.Group = dst_h5.get_common_group('tf_static')
 
     calibration_dir = os.path.join(config[CONFIG_DATASET_ROOT_DIR], DIR_CALIBRATION)
-    
+
     with open(os.path.join(calibration_dir, 'calib_cam_to_pose.txt'), mode='r') as f:
         line:str = f.readline()
         while line:
@@ -164,7 +164,7 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
                 set_pose(transforms_group, 'pose_to_cam3', translation, quaternion, FRAMEID_POSE, FRAMEID_CAM3)
                 set_pose(transforms_group, 'oxts_pose_to_cam3', translation, quaternion, FRAMEID_OXTS_POSE, FRAMEID_OXTS_CAM3)
             line:str = f.readline()
-    
+
     with open(os.path.join(calibration_dir, 'calib_cam_to_velo.txt'), mode='r') as f:
         values:List[str] = f.readline().split()
         matrix:np.ndarray = np.identity(4, dtype=np.float32)
@@ -173,7 +173,7 @@ def create_static_transforms(config:Dict[str, Union[str]], dst_h5:H5Dataset):
         translation, quaternion = invertTransform(translation=translation, quaternion=quaternion)
         set_pose(transforms_group, 'cam0_to_velo', translation, quaternion, FRAMEID_CAM0, FRAMEID_VELODYNE)
         set_pose(transforms_group, 'oxts_cam0_to_velo', translation, quaternion, FRAMEID_OXTS_CAM0, FRAMEID_OXTS_VELODYNE)
-    
+
     with open(os.path.join(calibration_dir, 'calib_sick_to_velo.txt'), mode='r') as f:
         values:List[str] = f.readline().split()
         matrix:np.ndarray = np.identity(4, dtype=np.float32)
@@ -189,7 +189,7 @@ def convert_timestamp(timestamp:str) -> Tuple[int, int]:
     else:
         return int(datetime.strptime(time_str_list[0], '%Y-%m-%d %H:%M:%S').timestamp()), int(time_str_list[1])
 
-def create_sequential_data(config:Dict[str, Union[str]], dst_h5:H5Dataset):
+def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
     data2dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_raw', config[CONFIG_SEQUENCE_DIR])
     data3dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_3d_raw', config[CONFIG_SEQUENCE_DIR])
     data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', 'train', config[CONFIG_SEQUENCE_DIR])
@@ -394,7 +394,7 @@ def main():
     parser.add_argument('-o', '--output-dir', type=str, metavar='PATH', required=True, help='Output Directory.')
     parser.add_argument('-s', '--sequence', type=int, choices=[0,2,3,4,5,6,7,9,10], required=True, help='Sequence of KITTI-360 Dataset.')
     args = parser.parse_args()
-    
+
     config:Dict[str, Union[str, int]] = {}
     config[CONFIG_DATASET_ROOT_DIR] = args.dataset_root_dir
     config[CONFIG_SEQUENCE] = args.sequence
@@ -403,18 +403,18 @@ def main():
         raise NotADirectoryError('"{0}" is not a directory.'.format(args.output_dir))
     config[CONFIG_HDF5_PATH] = os.path.join(args.output_dir, 'kitti360_seq{0:02d}.hdf5'.format(config[CONFIG_SEQUENCE]))
     print(config)
-    
+
     h5file:H5Dataset = H5Dataset(config[CONFIG_HDF5_PATH])
 
     create_sequential_data(config, h5file)
-    
+
     create_intrinsic(config, h5file)
 
     create_static_transforms(config, h5file)
 
     create_semanticsmap(config, h5file)
     create_labelconfig(h5file)
-    
+
     h5file.close()
 
     print('Saved "{0}"'.format(config[CONFIG_HDF5_PATH]))
