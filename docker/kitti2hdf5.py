@@ -8,7 +8,6 @@ DOCKER_IMAGE = 'h5_kitti360'
 
 def build():
     docker_dir: str = os.path.dirname(os.path.abspath(__file__))
-    print(docker_dir)
 
     proc = subprocess.run([
         'docker', 'build', '-t', DOCKER_IMAGE,
