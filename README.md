@@ -19,7 +19,7 @@ The script to convert the [KITTI-360 dataset](http://www.cvlibs.net/datasets/kit
     git clone https://github.com/shikishima-TasakiLab/h5_kitti360.git
     ```
 
-1. Run the following command to perform the conversion.
+1. Run the following command to perform the conversion. The first time, it takes a very long time to build the Docker image.
     ```bash
     python docker/kitti2hdf5.py -d /path/to/KITTI-360 -o /path/to/output/dir -s SEQUENCE
     ```
