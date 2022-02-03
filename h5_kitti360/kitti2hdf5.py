@@ -13,12 +13,14 @@ from .io import OxtsData, PlyData, SickData, VelodyneData
 from .constant import *
 
 def create_semanticsmap(config:Dict[str, str], dst_h5:H5Dataset):
-    search_path = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_3d_semantics', config[CONFIG_SEQUENCE_DIR], 'static', '*.ply')
+    search_path = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_3d_semantics', DIR_TRAIN, config[CONFIG_SEQUENCE_DIR], 'static', '*.ply')
     poly_paths = glob(search_path)
 
     dynamic_labels:np.ndarray = np.array([24, 25, 26, 27, 28, 29, 30, 31, 32, 33], dtype=np.uint8)
 
     points = Points(quiet=True)
+
+    # print(f'{"poly_paths":19s}:', len(poly_paths))
 
     for itr, ply_path in enumerate(poly_paths):
         print('SemanticMap {0:010d}'.format(itr))
@@ -192,9 +194,13 @@ def convert_timestamp(timestamp:str) -> Tuple[int, int]:
 def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
     data2dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_raw', config[CONFIG_SEQUENCE_DIR])
     data3dRaw_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_3d_raw', config[CONFIG_SEQUENCE_DIR])
-    data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', 'train', config[CONFIG_SEQUENCE_DIR])
+    data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', DIR_TRAIN, config[CONFIG_SEQUENCE_DIR])
     dataPoses_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_poses', config[CONFIG_SEQUENCE_DIR])
 
+    # print(f'{"data2dRaw dir":19s}:', data2dRaw_seq_dir)
+    # print(f'{"data3dRaw dir":19s}:', data3dRaw_seq_dir)
+    # print(f'{"data2dSemantic dir":19s}:', data2dSemantic_seq_dir)
+    # print(f'{"dataPoses dir":19s}:', dataPoses_seq_dir)
 
     image00data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, DIR_DATA_RECT, '*.png')))
     image00_timestamps:List[str]
@@ -212,6 +218,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
         image00_data_dict[key] = image00_dataset
 
+    # print(f'{"2d/rect/image00":19s}:', len(image00_data_dict))
 
     image01data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, DIR_DATA_RECT, '*.png')))
     image01_timestamps:List[str]
@@ -233,6 +240,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del image00_data_dict
 
+    # print(f'{"2d/rect/image01":19s}:', len(image01_data_dict))
 
     velodyne_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, DIR_DATA, '*.bin')))
     velodyne_timestamps:List[str]
@@ -253,6 +261,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del image01_data_dict
 
+    # print(f'{"3d/velodyne":19s}:', len(velodyne_data_dict))
 
     sick_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, DIR_DATA, '*.bin')))
     sick_timestamps:List[str]
@@ -274,6 +283,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del velodyne_data_dict
 
+    # print(f'{"3d/sick":19s}:', len(sick_data_dict))
 
     oxts_data_paths:List[str] = sorted(glob(os.path.join(dataPoses_seq_dir, DIR_OXTS, DIR_DATA, '*.txt')))
     oxts_timestamps:List[str]
@@ -294,8 +304,9 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del sick_data_dict
 
+    # print(f'{"pose/oxts":19s}:', len(oxts_data_dict))
 
-    semanticData_paths:List[str] = sorted(glob(os.path.join(data2dSemantic_seq_dir, DIR_SEMANTIC, '*.png')))
+    semanticData_paths:List[str] = sorted(glob(os.path.join(data2dSemantic_seq_dir, DIR_IMAGE00, DIR_SEMANTIC, '*.png')))
     semantic_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
     for semanticData_path in semanticData_paths:
         key = str(int(os.path.splitext(os.path.basename(semanticData_path))[0]))
@@ -309,6 +320,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del oxts_data_dict
 
+    # print(f'{"semantic":19s}:', len(semantic_data_dict))
 
     pose_data_dict:Dict[str, Dict[str, Union[Tuple[str, int, int], Tuple[np.ndarray, np.ndarray]]]] = {}
     with open(os.path.join(dataPoses_seq_dir, 'poses.txt'), mode='r') as f:
@@ -330,6 +342,8 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
             line:str = f.readline()
 
     del semantic_data_dict
+
+    # print(f'{"pose/gt":19s}:', len(pose_data_dict))
 
     success:bool = True
     for key, item in pose_data_dict.items():
@@ -413,6 +427,7 @@ def main():
     create_static_transforms(config, h5file)
 
     create_semanticsmap(config, h5file)
+
     create_labelconfig(h5file)
 
     h5file.close()
