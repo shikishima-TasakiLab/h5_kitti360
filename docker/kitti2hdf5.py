@@ -44,6 +44,7 @@ def main():
         remove=True,
         stderr=True,
         detach=True,
+        auto_remove=True,
         volumes={
             os.path.abspath(args['dataset_root_dir']): {'bind': '/workspace/KITTI-360', 'mode': 'ro'},
             os.path.abspath(args['output_dir']): {'bind': '/workspace/HDF5', 'mode': 'rw'}
