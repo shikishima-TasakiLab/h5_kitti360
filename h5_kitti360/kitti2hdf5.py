@@ -20,7 +20,7 @@ def create_semanticsmap(config:Dict[str, str], dst_h5:H5Dataset):
 
     points = Points(quiet=True)
 
-    # print(f'{"poly_paths":19s}:', len(poly_paths))
+    # print(f'{"poly_paths":19s}:', len(poly_paths), flush=True)
 
     for itr, ply_path in enumerate(poly_paths):
         print('SemanticMap {0:010d}'.format(itr))
@@ -55,7 +55,7 @@ def create_semanticsmap(config:Dict[str, str], dst_h5:H5Dataset):
 
     map_group = dst_h5.get_common_group('map')
     set_voxel_semantic3d(map_group, 'map', vgm_np, FRAMEID_WORLD, vgm_size, vgm_min, vgm_max, vgm_center, vgm_origin, LABEL_TAG, map_id='Seq{0:04d}'.format(config[CONFIG_SEQUENCE]))
-    print('SemanticMap Done')
+    print('SemanticMap Done', flush=True)
 
 def create_labelconfig(dst_h5:H5Dataset):
     label_group = dst_h5.get_label_group(LABEL_TAG)
@@ -197,10 +197,10 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
     data2dSemantic_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_2d_semantics', DIR_TRAIN, config[CONFIG_SEQUENCE_DIR])
     dataPoses_seq_dir:str = os.path.join(config[CONFIG_DATASET_ROOT_DIR], 'data_poses', config[CONFIG_SEQUENCE_DIR])
 
-    # print(f'{"data2dRaw dir":19s}:', data2dRaw_seq_dir)
-    # print(f'{"data3dRaw dir":19s}:', data3dRaw_seq_dir)
-    # print(f'{"data2dSemantic dir":19s}:', data2dSemantic_seq_dir)
-    # print(f'{"dataPoses dir":19s}:', dataPoses_seq_dir)
+    # print(f'{"data2dRaw dir":19s}:', data2dRaw_seq_dir, flush=True)
+    # print(f'{"data3dRaw dir":19s}:', data3dRaw_seq_dir, flush=True)
+    # print(f'{"data2dSemantic dir":19s}:', data2dSemantic_seq_dir, flush=True)
+    # print(f'{"dataPoses dir":19s}:', dataPoses_seq_dir, flush=True)
 
     image00data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE00, DIR_DATA_RECT, '*.png')))
     image00_timestamps:List[str]
@@ -218,7 +218,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
         image00_data_dict[key] = image00_dataset
 
-    # print(f'{"2d/rect/image00":19s}:', len(image00_data_dict))
+    # print(f'{"2d/rect/image00":19s}:', len(image00_data_dict), flush=True)
 
     image01data_paths:List[str] = sorted(glob(os.path.join(data2dRaw_seq_dir, DIR_IMAGE01, DIR_DATA_RECT, '*.png')))
     image01_timestamps:List[str]
@@ -240,7 +240,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del image00_data_dict
 
-    # print(f'{"2d/rect/image01":19s}:', len(image01_data_dict))
+    # print(f'{"2d/rect/image01":19s}:', len(image01_data_dict), flush=True)
 
     velodyne_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_VELODYNE_POINTS, DIR_DATA, '*.bin')))
     velodyne_timestamps:List[str]
@@ -261,7 +261,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del image01_data_dict
 
-    # print(f'{"3d/velodyne":19s}:', len(velodyne_data_dict))
+    # print(f'{"3d/velodyne":19s}:', len(velodyne_data_dict), flush=True)
 
     sick_data_paths:List[str] = sorted(glob(os.path.join(data3dRaw_seq_dir, DIR_SICK_POINTS, DIR_DATA, '*.bin')))
     sick_timestamps:List[str]
@@ -283,7 +283,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del velodyne_data_dict
 
-    # print(f'{"3d/sick":19s}:', len(sick_data_dict))
+    # print(f'{"3d/sick":19s}:', len(sick_data_dict), flush=True)
 
     oxts_data_paths:List[str] = sorted(glob(os.path.join(dataPoses_seq_dir, DIR_OXTS, DIR_DATA, '*.txt')))
     oxts_timestamps:List[str]
@@ -304,7 +304,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del sick_data_dict
 
-    # print(f'{"pose/oxts":19s}:', len(oxts_data_dict))
+    # print(f'{"pose/oxts":19s}:', len(oxts_data_dict), flush=True)
 
     semanticData_paths:List[str] = sorted(glob(os.path.join(data2dSemantic_seq_dir, DIR_IMAGE00, DIR_SEMANTIC, '*.png')))
     semantic_data_dict:Dict[str, Dict[str, Tuple[str, int, int]]] = {}
@@ -320,7 +320,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del oxts_data_dict
 
-    # print(f'{"semantic":19s}:', len(semantic_data_dict))
+    # print(f'{"semantic":19s}:', len(semantic_data_dict), flush=True)
 
     pose_data_dict:Dict[str, Dict[str, Union[Tuple[str, int, int], Tuple[np.ndarray, np.ndarray]]]] = {}
     with open(os.path.join(dataPoses_seq_dir, 'poses.txt'), mode='r') as f:
@@ -343,7 +343,7 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
 
     del semantic_data_dict
 
-    # print(f'{"pose/gt":19s}:', len(pose_data_dict))
+    # print(f'{"pose/gt":19s}:', len(pose_data_dict), flush=True)
 
     success:bool = True
     for key, item in pose_data_dict.items():
@@ -394,13 +394,13 @@ def create_sequential_data(config:Dict[str, str], dst_h5:H5Dataset):
         set_pose(data_group, 'oxts', oxts_tr, oxts_q, FRAMEID_WORLD, FRAMEID_OXTS_POSE, oxts_sec, oxts_nsec)
 
         success = True
-        print('SequentialData {0:010d}'.format(dst_h5.get_current_data_index()))
-        print('image00  :', image00_data_path)
-        print('image01  :', image01_data_path)
-        print('semantic :', semantic_data_path)
-        print('velodyne :', velodyne_data_path)
-        print('sick     :', sick_data_path)
-        print('oxts     :', oxts_data_path)
+        print(f'SequentialData {dst_h5.get_current_data_index():010d}', flush=True)
+        print('image00  :', image00_data_path, flush=True)
+        print('image01  :', image01_data_path, flush=True)
+        print('semantic :', semantic_data_path, flush=True)
+        print('velodyne :', velodyne_data_path, flush=True)
+        print('sick     :', sick_data_path, flush=True)
+        print('oxts     :', oxts_data_path, flush=True)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -416,7 +416,7 @@ def main():
     if os.path.isdir(args.output_dir) is False:
         raise NotADirectoryError('"{0}" is not a directory.'.format(args.output_dir))
     config[CONFIG_HDF5_PATH] = os.path.join(args.output_dir, 'kitti360_seq{0:02d}.hdf5'.format(config[CONFIG_SEQUENCE]))
-    print(config)
+    print(config, flush=True)
 
     h5file:H5Dataset = H5Dataset(config[CONFIG_HDF5_PATH])
 
@@ -432,7 +432,7 @@ def main():
 
     h5file.close()
 
-    print('Saved "{0}"'.format(config[CONFIG_HDF5_PATH]))
+    print('Saved "{0}"'.format(config[CONFIG_HDF5_PATH]), flush=True)
 
 if __name__=='__main__':
     main()
